@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MercadoLibre — Escáner de Paquetes</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg:#f0f2f5; --surface:#ffffff; --card:#ffffff; --border:#e0e4ef;
+    --accent:#2D3277; --accent2:#FFE600; --accent3:#00a650;
+    --warn:#f59e0b; --danger:#ef4444; --text:#1a1f36; --muted:#6b7280;
+    --mono:'Space Mono',monospace; --sans:'Inter',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+  /* ── SETUP BANNER ── */
+  .setup-banner{
+    display:none; align-items:flex-start; gap:12px; padding:14px 18px;
+    background:#fffbeb; border-bottom:2px solid #FFE600;
+  }
+  .setup-banner.show{display:flex;}
+  .setup-icon{font-size:22px;flex-shrink:0;margin-top:1px;}
+  .setup-text{flex:1;}
+  .setup-title{font-size:13px;font-weight:700;color:#92400e;margin-bottom:3px;}
+  .setup-desc{font-size:11px;color:var(--muted);line-height:1.6;}
+  .setup-desc a{color:var(--accent);text-decoration:none;}
+  .setup-input-row{display:flex;gap:8px;margin-top:8px;}
+  .setup-input{
+    flex:1;padding:8px 12px;background:#fff;border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;
+  }
+  .setup-input:focus{border-color:var(--accent);}
+  .setup-save-btn{
+    padding:8px 14px;background:var(--accent);color:#fff;border:none;
+    border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;
+    font-family:var(--sans);
+  }
+
+  /* ── HEADER ── */
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:3px solid var(--accent2);background:var(--accent);position:sticky;top:0;z-index:100;}
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--sans);font-size:16px;font-weight:700;color:#fff;letter-spacing:-0.3px;}
+  .logo-icon{width:32px;height:32px;background:#FFE600;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .logo-text{display:flex;flex-direction:column;line-height:1.1;}
+  .logo-brand{font-size:14px;font-weight:700;color:#FFE600;letter-spacing:0px;}
+  .logo-sub{font-size:9px;font-weight:400;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;}
+  .header-right{display:flex;align-items:center;gap:8px;}
+  .sheets-pill{
+    display:flex;align-items:center;gap:6px;padding:5px 11px;
+    background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+    border-radius:20px;font-size:11px;font-weight:700;color:#fff;
+    cursor:pointer;transition:all .2s;font-family:var(--mono);
+  }
+  .sheets-pill:hover{background:rgba(255,255,255,.25);}
+  .sheets-pill.syncing{color:#FFE600;border-color:rgba(255,230,0,.5);background:rgba(255,230,0,.1);}
+  .sheets-pill.error{color:#fca5a5;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);}
+  .sheets-pill.not-configured{color:rgba(255,255,255,.6);border-color:rgba(255,255,255,.2);background:transparent;}
+  .sdot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .sdot.pulse{animation:dotPulse 1s infinite;}
+  @keyframes dotPulse{0%,100%{opacity:1}50%{opacity:.2}}
+  .icon-btn{width:36px;height:36px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;color:#fff;font-size:15px;}
+  .icon-btn:hover{background:rgba(255,255,255,.25);}
+
+  /* ── TABS ── */
+  .tabs{display:flex;padding:10px 20px;gap:8px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;box-shadow:0 1px 4px rgba(45,50,119,.06);}
+  .tab{padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* ── CAMERA ── */
+  .camera-section{display:none;}
+  .camera-section.active{display:block;}
+  .camera-wrapper{position:relative;width:100%;background:#000;overflow:hidden;}
+  #video{width:100%;display:block;max-height:52vh;object-fit:cover;}
+  .camera-overlay{position:absolute;inset:0;pointer-events:none;}
+  .scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88%;height:68%;border:2px solid rgba(45,50,119,.6);border-radius:8px;}
+  .scan-frame::before,.scan-frame::after,.scan-frame>.c1,.scan-frame>.c2{content:'';position:absolute;width:22px;height:22px;border-color:var(--accent);border-style:solid;}
+  .scan-frame::before{top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}
+  .scan-frame::after{top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}
+  .scan-frame>.c1{bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}
+  .scan-frame>.c2{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}
+  .field-zones{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+  .field-zone-wrap{width:84%;display:flex;flex-direction:column;gap:5px;transform:translateY(-4px);}
+  .fz{display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,.52);backdrop-filter:blur(4px);border-left:3px solid;font-family:var(--mono);font-size:10px;letter-spacing:.5px;}
+  .fz.origen{border-color:#7c3aed;color:#a78bfa;}
+  .fz.pkg{border-color:#00e5ff;color:#00e5ff;}
+  .fz.fecha{border-color:#10b981;color:#34d399;}
+  .scan-line{position:absolute;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#FFE600,transparent);box-shadow:0 0 8px #FFE600;animation:scanMove 2.5s ease-in-out infinite;top:20%;}
+  @keyframes scanMove{0%{top:18%;opacity:1}45%{top:78%;opacity:1}50%{opacity:0}55%{top:18%;opacity:0}60%{opacity:1}100%{top:78%;opacity:1}}
+  .cam-controls{display:flex;align-items:center;justify-content:center;gap:28px;padding:16px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 2px 8px rgba(45,50,119,.06);}
+  .ctrl-btn{width:44px;height:44px;border-radius:12px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--muted);transition:all .2s;}
+  .ctrl-btn:hover{color:var(--accent);border-color:var(--accent);background:#e8eaf6;}
+  .capture-btn{width:66px;height:66px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#3d45a0);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:26px;box-shadow:0 4px 20px rgba(45,50,119,.4);transition:all .15s;position:relative;}
+  .capture-btn:active{transform:scale(.93);}
+  .capture-btn::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid rgba(45,50,119,.35);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.12);opacity:0}}
+  .no-camera{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 30px;gap:14px;text-align:center;background:var(--bg);}
+  .no-camera .icon{font-size:48px;opacity:.4;}
+  .no-camera h3{font-size:17px;font-weight:600;color:var(--text);}
+  .no-camera p{color:var(--muted);font-size:13px;line-height:1.6;}
+  .allow-btn{margin-top:6px;padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+
+  /* ── LIVE RESULT ── */
+  .live-result{margin:14px 16px;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:none;box-shadow:0 2px 12px rgba(45,50,119,.08);}
+  .live-result.show{display:block;animation:fadeIn .3s ease;}
+  .lr-header{padding:11px 16px;background:var(--accent);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#fff;letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+  .lr-sync{margin-left:auto;font-size:9px;display:flex;align-items:center;gap:4px;}
+  .lr-fields{padding:12px 16px;display:flex;flex-direction:column;gap:9px;}
+  .lr-field{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;background:#f8f9ff;border:1px solid var(--border);}
+  .lr-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+  .lr-info{flex:1;min-width:0;}
+  .lr-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
+  .lr-value{font-size:14px;font-weight:600;word-break:break-word;}
+  .lr-value.found{color:var(--text);}
+  .lr-value.missing{color:#9ca3af;font-style:italic;font-weight:400;font-size:12px;}
+  .lr-copy{background:none;border:none;color:#9ca3af;cursor:pointer;font-size:13px;padding:4px;border-radius:6px;flex-shrink:0;transition:color .2s;}
+  .lr-copy:hover{color:var(--accent);}
+  .conf-bar{margin:0 16px 12px;display:flex;align-items:center;gap:10px;}
+  .conf-label{font-family:var(--mono);font-size:10px;color:var(--muted);}
+  .conf-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .conf-fill{height:100%;border-radius:2px;transition:width .8s ease;}
+  .conf-pct{font-family:var(--mono);font-size:10px;color:var(--accent3);}
+
+  /* ── GALLERY ── */
+  .gallery-section{display:none;}
+  .gallery-section.active{display:block;}
+  .sheets-banner{display:flex;align-items:center;gap:10px;padding:12px 20px;background:#e8edf8;border-bottom:1px solid #c5d0e8;}
+  .sheets-banner-icon{font-size:20px;}
+  .sheets-banner-text{flex:1;}
+  .sheets-banner-title{font-size:13px;font-weight:600;color:var(--accent);}
+  .sheets-banner-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+  .sheets-open-btn{padding:6px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--mono);white-space:nowrap;transition:all .2s;}
+  .sheets-open-btn:hover{background:#3d45a0;}
+  .gallery-header{padding:14px 20px 8px;display:flex;align-items:center;justify-content:space-between;}
+  .section-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+  .count-chip{padding:3px 10px;background:#e8edf8;border:1px solid #c5d0e8;border-radius:12px;font-family:var(--mono);font-size:11px;color:var(--accent);}
+  .gallery-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:10px;}
+  .pkg-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .2s;animation:fadeIn .3s ease;box-shadow:0 1px 4px rgba(45,50,119,.07);}
+  .pkg-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 14px rgba(45,50,119,.12);}
+  .pkg-card-header{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);}
+  .pkg-thumb{width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;}
+  .pkg-thumb-ph{width:50px;height:50px;background:#f0f2f5;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  .pkg-card-title{flex:1;min-width:0;}
+  .pkg-id{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pkg-date-scan{font-size:11px;color:var(--muted);margin-top:2px;}
+  .pkg-synced{font-size:9px;color:#00a650;margin-top:2px;}
+  .pkg-synced.pending{color:var(--warn);}
+  .pkg-synced.failed{color:var(--danger);}
+  .pkg-card-fields{display:grid;grid-template-columns:1fr 1fr;padding:10px 14px 12px;gap:8px;}
+  .pf-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:2px;}
+  .pf-value{font-size:13px;font-weight:500;}
+  .pf-value.ok{color:var(--text);}
+  .pf-value.nd{color:var(--muted);font-style:italic;font-size:12px;}
+  .fecha-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
+  .fb-ok{background:rgba(0,166,80,.12);color:#00a650;}
+  .fb-urgent{background:rgba(245,158,11,.15);color:#d97706;}
+  .fb-late{background:rgba(239,68,68,.12);color:#dc2626;}
+  .fb-nd{background:#f0f2f5;color:var(--muted);}
+  .empty-gallery{text-align:center;padding:50px 20px;color:var(--muted);}
+  .empty-gallery .icon{font-size:42px;display:block;margin-bottom:12px;opacity:.4;}
+  .empty-gallery p{font-size:14px;}
+
+  /* ── MODAL ── */
+  .modal-backdrop{display:none;position:fixed;inset:0;z-index:200;background:rgba(45,50,119,.4);backdrop-filter:blur(8px);align-items:flex-end;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:20px;animation:slideUp .28s ease;border:1px solid var(--border);border-bottom:none;box-shadow:0 -4px 24px rgba(45,50,119,.12);}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px;}
+  .modal-img{width:100%;border-radius:12px;display:block;margin-bottom:12px;max-height:190px;object-fit:cover;}
+  .modal-fields{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+  .mf{padding:11px 14px;border-radius:12px;background:#f8f9ff;border:1px solid var(--border);display:flex;gap:12px;align-items:flex-start;}
+  .mf-icon{font-size:20px;}
+  .mf-info{flex:1;}
+  .mf-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
+  .mf-value{font-size:15px;font-weight:600;}
+  .mf-value.found{color:var(--text);}
+  .mf-value.missing{color:#9ca3af;font-style:italic;font-weight:400;font-size:13px;}
+  .modal-actions{display:flex;gap:8px;}
+  .action-btn{flex:1;padding:12px;border-radius:12px;border:none;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-sheets{background:#e8edf8;color:var(--accent);border:1px solid #c5d0e8;}
+  .btn-secondary{background:#f0f2f5;color:var(--text);border:1px solid var(--border);}
+  .btn-danger{background:rgba(239,68,68,.08);color:var(--danger);border:1px solid rgba(239,68,68,.2);}
+  .action-btn:hover{opacity:.85;}
+
+  /* ── PROCESSING ── */
+  .processing{display:none;position:fixed;inset:0;z-index:300;background:rgba(45,50,119,.88);backdrop-filter:blur(6px);flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+  .processing.show{display:flex;}
+  .spinner{width:50px;height:50px;border:3px solid rgba(255,255,255,.2);border-top-color:#FFE600;border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .proc-label{font-family:var(--mono);font-size:12px;color:#FFE600;letter-spacing:2px;}
+  .proc-steps{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,.5);}
+  .step{opacity:0;transition:opacity .4s;}
+  .step.visible{opacity:1;color:#fff;}
+  .step.done{color:#FFE600;}
+
+  .flash{display:none;position:fixed;inset:0;z-index:400;background:#fff;pointer-events:none;}
+  .flash.show{display:block;animation:flashAnim .35s ease;}
+  @keyframes flashAnim{0%{opacity:.9}100%{opacity:0}}
+
+  #fileInput{display:none;}
+  canvas{display:none;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--text);opacity:0;transition:all .3s;z-index:500;white-space:nowrap;box-shadow:0 4px 16px rgba(45,50,119,.12);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.ok{border-color:rgba(0,166,80,.4);color:#00a650;}
+  .toast.warn{border-color:rgba(245,158,11,.4);color:#d97706;}
+  .toast.err{border-color:rgba(239,68,68,.4);color:#dc2626;}
+
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-thumb{background:#c5d0e8;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="flash" id="flash"></div>
+
+<!-- PROCESSING -->
+<div class="processing" id="processing">
+  <div class="spinner"></div>
+  <div class="proc-label">ANALIZANDO PAQUETE</div>
+  <div class="proc-steps">
+    <div class="step" id="s1">📸 Capturando imagen...</div>
+    <div class="step" id="s2">🤖 Analizando con IA...</div>
+    <div class="step" id="s3">⬛ Leyendo cuadro negro — origen...</div>
+    <div class="step" id="s4">📊 Guardando en Google Sheets...</div>
+    <div class="step" id="s5">✅ Listo</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal"><div class="modal-handle"></div><div id="modalContent"></div></div>
+</div>
+
+<!-- SETUP BANNER -->
+<div class="setup-banner" id="setupBanner">
+  <div class="setup-icon">⚙️</div>
+  <div class="setup-text">
+    <div class="setup-title">Conecta con Google Sheets</div>
+    <div class="setup-desc">
+      Pega la URL de tu Google Apps Script Web App para activar el guardado automático.
+      <br><a href="#" onclick="showSetupGuide(); return false;">¿Cómo obtener la URL? →</a>
+    </div>
+    <div class="setup-input-row">
+      <input class="setup-input" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" type="url">
+      <button class="setup-save-btn" onclick="saveScriptUrl()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    <div class="logo-text">
+      <div class="logo-brand">MercadoLibre</div>
+      <div class="logo-sub">Escáner de Paquetes</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="sheets-pill not-configured" id="sheetsPill" onclick="openSheet()">
+      <div class="sdot" id="sheetsDot"></div>
+      <span id="sheetsLabel">Sheets</span>
+    </div>
+    <label for="fileInput" class="icon-btn" title="Subir imagen">🖼️</label>
+  </div>
+</header>
+<input type="file" id="fileInput" accept="image/*" onchange="handleFileUpload(event)">
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('camera',this)">📷 Escáner</button>
+  <button class="tab" onclick="switchTab('gallery',this)">📦 Historial (<span id="countBadge">0</span>)</button>
+</div>
+
+<!-- CAMERA -->
+<div class="camera-section active" id="cameraSection">
+  <div class="camera-wrapper" id="cameraWrapper">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="camera-overlay">
+      <div class="scan-frame"><div class="c1"></div><div class="c2"></div></div>
+      <div class="field-zones">
+        <div class="field-zone-wrap">
+          <div class="fz origen">⬛ ORIGEN — cuadro negro ↖</div>
+          <div class="fz pkg">📦 ID / GUÍA del paquete</div>
+          <div class="fz fecha">📅 FECHA PROMESA de entrega</div>
+        </div>
+      </div>
+      <div class="scan-line"></div>
+    </div>
+  </div>
+  <div class="no-camera" id="noCameraMsg" style="display:none">
+    <div class="icon">📷</div>
+    <h3>Cámara no disponible</h3>
+    <p>Permite el acceso o sube una imagen.</p>
+    <button class="allow-btn" onclick="initCamera()">Permitir cámara</button>
+  </div>
+  <div class="cam-controls" id="camControls">
+    <div class="ctrl-btn" onclick="toggleFlash()">🔦</div>
+    <button class="capture-btn" onclick="capture()">📸</button>
+    <div class="ctrl-btn" onclick="switchCamera()">🔄</div>
+  </div>
+  <div class="live-result" id="liveResult">
+    <div class="lr-header">
+      <span>📦</span> DATOS DETECTADOS
+      <div class="lr-sync" id="lrSync"></div>
+    </div>
+    <div class="lr-fields" id="lrFields"></div>
+    <div class="conf-bar">
+      <span class="conf-label">CONFIANZA</span>
+      <div class="conf-track"><div class="conf-fill" id="confFill" style="width:0%"></div></div>
+      <span class="conf-pct" id="confPct">0%</span>
+    </div>
+  </div>
+</div>
+
+<!-- GALLERY -->
+<div class="gallery-section" id="gallerySection">
+  <div class="sheets-banner">
+    <div class="sheets-banner-icon">📊</div>
+    <div class="sheets-banner-text">
+      <div class="sheets-banner-title">Google Sheets</div>
+      <div class="sheets-banner-sub" id="bannerSub">Configura el webhook para sincronizar</div>
+    </div>
+    <button class="sheets-open-btn" onclick="openSheet()">Abrir ↗</button>
+  </div>
+  <div class="gallery-header">
+    <div class="section-title">Paquetes escaneados</div>
+    <div class="count-chip" id="countChip">0 registros</div>
+  </div>
+  <div class="gallery-list" id="galleryList"></div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<!-- SETUP GUIDE MODAL -->
+<div class="modal-backdrop" id="guideModal">
+  <div class="modal" style="max-height:92vh">
+    <div class="modal-handle"></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:16px">CONFIGURAR GOOGLE SHEETS</div>
+    <div style="display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:1.7;color:var(--muted)">
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:700;color:var(--text);margin-bottom:8px;display:flex;gap:8px;align-items:center"><span style="background:var(--accent);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">1</span> Abre tu Google Sheet</div>
+        <span>Ve al Sheet <strong style="color:var(--text)">PkgScan — Historial de Paquetes</strong> en tu Google Drive.</span>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:700;color:var(--text);margin-bottom:8px;display:flex;gap:8px;align-items:center"><span style="background:var(--accent);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">2</span> Abre Apps Script</div>
+        <span>En el menú: <strong style="color:var(--text)">Extensiones → Apps Script</strong></span>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:700;color:var(--text);margin-bottom:10px;display:flex;gap:8px;align-items:center"><span style="background:var(--accent);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">3</span> Pega este código</div>
+        <div style="background:#000;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:10px;color:#a78bfa;line-height:1.8;overflow-x:auto;white-space:pre" id="scriptCode">function doPost(e) {
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getActiveSheet();
+
+  // Encabezados si la hoja está vacía
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      'Fecha Escaneo',
+      'Origen (Cuadro Negro)',
+      'ID / Guía Paquete',
+      'Fecha Promesa',
+      'Confianza IA (%)',
+      'Notas'
+    ]);
+    // Formato encabezados
+    sheet.getRange(1,1,1,6)
+      .setBackground('#1a1a1a')
+      .setFontColor('#00e5ff')
+      .setFontWeight('bold');
+  }
+
+  const data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    data.fecha     || '',
+    data.origen    || 'N/D',
+    data.id_paquete|| 'N/D',
+    data.fecha_promesa || 'N/D',
+    data.confianza || 0,
+    data.notas     || ''
+  ]);
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ok:true}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({status:'PkgScan OK'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</div>
+        <button onclick="copyScript()" style="margin-top:10px;width:100%;padding:9px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">📋 Copiar código</button>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:700;color:var(--text);margin-bottom:8px;display:flex;gap:8px;align-items:center"><span style="background:var(--accent);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">4</span> Despliega como Web App</div>
+        <span>Clic en <strong style="color:var(--text)">Implementar → Nueva implementación</strong><br>
+        Tipo: <strong style="color:var(--text)">Web App</strong><br>
+        Ejecutar como: <strong style="color:var(--text)">Yo</strong><br>
+        Quién tiene acceso: <strong style="color:var(--text)">Cualquier persona</strong><br>
+        → Clic en <strong style="color:var(--text)">Implementar</strong> y copia la URL</span>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:700;color:var(--text);margin-bottom:8px;display:flex;gap:8px;align-items:center"><span style="background:var(--accent);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">5</span> Pega la URL en la app</div>
+        <span>La URL tiene el formato:<br><span style="font-family:var(--mono);font-size:10px;color:var(--accent)">https://script.google.com/macros/s/ABC.../exec</span><br>Pégala arriba donde dice "Configurar".</span>
+      </div>
+
+    </div>
+    <button onclick="closeGuide()" style="margin-top:18px;width:100%;padding:13px;background:var(--accent);color:#000;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Entendido ✓</button>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───
+const SHEET_ID  = '1SDbdSNrG4vpdF93K49baJM1BHfHI9j7FKUUPQhvpfpY';
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+
+// ─── STATE ───
+let stream = null, facingMode = 'environment', flashOn = false;
+let scans = JSON.parse(localStorage.getItem('pkgscan_v4') || '[]');
+let SCRIPT_URL = localStorage.getItem('pkgscan_script_url') || '';
+
+// ─── INIT ───
+window.addEventListener('DOMContentLoaded', () => {
+  initCamera();
+  renderGallery();
+  updateBadge();
+  checkSetup();
+});
+
+function checkSetup() {
+  const banner = document.getElementById('setupBanner');
+  if (!SCRIPT_URL) {
+    banner.classList.add('show');
+    document.getElementById('setupBanner').querySelector('input').value = '';
+    setSheetsStatus('not-configured');
+  } else {
+    banner.classList.remove('show');
+    setSheetsStatus('ok');
+  }
+}
+
+function saveScriptUrl() {
+  const val = document.getElementById('scriptUrlInput').value.trim();
+  if (!val.startsWith('https://script.google.com/')) {
+    showToast('⚠️ URL inválida — debe ser de script.google.com', 'warn');
+    return;
+  }
+  SCRIPT_URL = val;
+  localStorage.setItem('pkgscan_script_url', SCRIPT_URL);
+  checkSetup();
+  showToast('✅ Webhook guardado — Sheets conectado', 'ok');
+  // Retry pending scans
+  retrySyncPending();
+}
+
+// ─── CAMERA ───
+async function initCamera() {
+  const wrapper = document.getElementById('cameraWrapper');
+  const noMsg   = document.getElementById('noCameraMsg');
+  const ctrl    = document.getElementById('camControls');
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode, width:{ideal:1920}, height:{ideal:1080} }, audio:false
+    });
+    document.getElementById('video').srcObject = stream;
+    wrapper.style.display = 'block';
+    noMsg.style.display   = 'none';
+    ctrl.style.display    = 'flex';
+  } catch(e) {
+    wrapper.style.display = 'none';
+    noMsg.style.display   = 'flex';
+    ctrl.style.display    = 'none';
+  }
+}
+function switchCamera() { facingMode = facingMode==='environment'?'user':'environment'; initCamera(); }
+function toggleFlash() {
+  if (!stream) return;
+  flashOn = !flashOn;
+  try { stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:flashOn}]}); } catch(e){}
+  showToast(flashOn?'🔦 Flash ON':'🔦 Flash OFF');
+}
+
+// ─── CAPTURE ───
+function capture() {
+  const video = document.getElementById('video');
+  if (!video.srcObject) { showToast('❌ Sin cámara activa'); return; }
+  const flash = document.getElementById('flash');
+  flash.classList.add('show');
+  setTimeout(()=>flash.classList.remove('show'), 350);
+  const canvas = document.getElementById('canvas');
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  processImage(canvas.toDataURL('image/jpeg', 0.9));
+}
+function handleFileUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => processImage(ev.target.result);
+  reader.readAsDataURL(file); e.target.value = '';
+}
+
+// ─── AI ANALYSIS ───
+async function processImage(imageData) {
+  showProcessing();
+  stepV('s1'); await delay(300);
+  stepV('s2');
+
+  let parsed = null;
+  try {
+    const base64    = imageData.split(',')[1];
+    const mediaType = imageData.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: `Eres un sistema especializado en leer etiquetas y documentos de paquetería/logística.
+
+INSTRUCCIÓN CRÍTICA PARA EL CAMPO "origen":
+El origen se encuentra EXCLUSIVAMENTE en el CUADRO NEGRO (fondo negro con texto blanco o de color claro) ubicado en la PARTE SUPERIOR IZQUIERDA de la etiqueta. Lee únicamente las letras o texto visible dentro de ese rectángulo o cuadro oscuro en esa esquina. Si no existe ese cuadro negro en la parte superior izquierda, devuelve null para origen. NO tomes el origen de otra parte de la etiqueta.
+
+Extrae ÚNICAMENTE estos campos en JSON puro (sin markdown):
+{
+  "origen": "texto exacto del cuadro negro superior izquierdo, o null",
+  "id_paquete": "código de rastreo o número de guía, o null",
+  "fecha_promesa": "fecha prometida de entrega en formato DD/MM/YYYY, o null",
+  "confianza": número 0-100,
+  "notas": "observación breve o null"
+}
+Responde SOLO con el JSON.`,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image', source:{type:'base64', media_type:mediaType, data:base64}},
+            {type:'text',  text:'Extrae: 1) origen del cuadro negro ↖, 2) ID/guía del paquete, 3) fecha promesa.'}
+          ]
+        }]
+      })
+    });
+
+    stepD('s2'); stepV('s3');
+    const data = await res.json();
+    const raw  = data.content?.find(b=>b.type==='text')?.text || '{}';
+    parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+  } catch(err) {
+    console.error('AI error:', err);
+    parsed = {origen:null, id_paquete:null, fecha_promesa:null, confianza:0, notas:'Error al procesar'};
+  }
+
+  stepD('s3'); stepV('s4');
+
+  // ─ Build scan record ─
+  const scan = {
+    id:            Date.now(),
+    image:         imageData,
+    origen:        parsed.origen        || null,
+    id_paquete:    parsed.id_paquete    || null,
+    fecha_promesa: parsed.fecha_promesa || null,
+    confianza:     parsed.confianza     || 0,
+    notas:         parsed.notas         || null,
+    date:          new Date().toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}),
+    synced:        false
+  };
+
+  // ─ Send to Sheets ─
+  const ok = await pushToSheets(scan);
+  scan.synced = ok;
+
+  stepD('s4'); stepV('s5');
+  await delay(300);
+  hideProcessing();
+
+  scans.unshift(scan);
+  localStorage.setItem('pkgscan_v4', JSON.stringify(scans));
+  renderGallery(); updateBadge();
+  showLiveResult(scan, ok);
+  showToast(ok ? '📊 Guardado en Sheets' : '💾 Guardado localmente', ok?'ok':'warn');
+}
+
+// ─── PUSH TO SHEETS (Google Apps Script Web App) ───
+async function pushToSheets(scan) {
+  if (!SCRIPT_URL) return false;
+  setSheetsStatus('syncing');
+  try {
+    const payload = {
+      fecha:         scan.date,
+      origen:        scan.origen        || 'N/D',
+      id_paquete:    scan.id_paquete    || 'N/D',
+      fecha_promesa: scan.fecha_promesa || 'N/D',
+      confianza:     scan.confianza,
+      notas:         scan.notas         || ''
+    };
+
+    // Use no-cors mode to avoid CORS issues with Apps Script
+    await fetch(SCRIPT_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify(payload)
+    });
+
+    // no-cors returns opaque response — treat as success if no exception
+    setSheetsStatus('ok');
+    return true;
+  } catch(err) {
+    console.error('Sheets push error:', err);
+    setSheetsStatus('error');
+    return false;
+  }
+}
+
+async function retrySyncPending() {
+  const pending = scans.filter(s=>!s.synced);
+  if (!pending.length) return;
+  showToast(`🔄 Sincronizando ${pending.length} registro(s) pendiente(s)…`, 'warn');
+  let synced = 0;
+  for (const s of pending) {
+    const ok = await pushToSheets(s);
+    if (ok) { s.synced = true; synced++; }
+    await delay(400);
+  }
+  localStorage.setItem('pkgscan_v4', JSON.stringify(scans));
+  renderGallery();
+  if (synced) showToast(`✅ ${synced} registro(s) enviado(s) a Sheets`, 'ok');
+}
+
+// ─── SHEETS STATUS ───
+function setSheetsStatus(status) {
+  const pill  = document.getElementById('sheetsPill');
+  const dot   = document.getElementById('sheetsDot');
+  const label = document.getElementById('sheetsLabel');
+  pill.className = 'sheets-pill';
+  dot.className  = 'sdot';
+  const map = {
+    'ok':             ['','','Sheets ✓'],
+    'syncing':        ['syncing','pulse','Sync…'],
+    'error':          ['error','','Sheets ✗'],
+    'not-configured': ['not-configured','','Sin config']
+  };
+  const [pc,dc,lbl] = map[status] || map['ok'];
+  if(pc) pill.classList.add(pc);
+  if(dc) dot.classList.add(dc);
+  label.textContent = lbl;
+}
+function openSheet() { window.open(SHEET_URL,'_blank'); }
+
+// ─── LIVE RESULT ───
+function showLiveResult(scan, synced) {
+  const card = document.getElementById('liveResult');
+  document.getElementById('lrSync').innerHTML = synced
+    ? '<span style="color:#34d399">● SHEETS</span>'
+    : '<span style="color:#fbbf24">● LOCAL</span>';
+
+  document.getElementById('lrFields').innerHTML =
+    fRow('⬛','ORIGEN (cuadro negro ↖)', scan.origen) +
+    fRow('📦','ID / GUÍA PAQUETE',       scan.id_paquete) +
+    fRow('📅','FECHA PROMESA',            scan.fecha_promesa) +
+    (scan.notas ? `<div style="padding:7px 11px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);border-radius:8px;font-size:11px;color:#fbbf24">💡 ${scan.notas}</div>` : '');
+
+  const pct  = scan.confianza;
+  const fill = document.getElementById('confFill');
+  fill.style.background = pct>=70?'var(--accent3)':pct>=40?'var(--warn)':'var(--danger)';
+  fill.style.width = '0%';
+  setTimeout(()=>{ fill.style.width=pct+'%'; document.getElementById('confPct').textContent=pct+'%'; }, 80);
+  card.classList.add('show');
+}
+
+function fRow(icon, label, value) {
+  const found = value !== null && value !== undefined;
+  return `<div class="lr-field">
+    <div class="lr-icon">${icon}</div>
+    <div class="lr-info">
+      <div class="lr-label">${label}</div>
+      <div class="lr-value ${found?'found':'missing'}">${found?value:'No detectado'}</div>
+    </div>
+    ${found?`<button class="lr-copy" onclick="copyVal('${String(value).replace(/'/g,"\\'")}','${label}')">📋</button>`:''}
+  </div>`;
+}
+function copyVal(v,l){ navigator.clipboard.writeText(v).then(()=>showToast(`📋 ${l} copiado`)); }
+
+// ─── PROCESSING ───
+function showProcessing() {
+  document.getElementById('processing').classList.add('show');
+  ['s1','s2','s3','s4','s5'].forEach(id=>{ document.getElementById(id).className='step'; });
+}
+function hideProcessing() { document.getElementById('processing').classList.remove('show'); }
+function stepV(id){ document.getElementById(id).classList.add('visible'); }
+function stepD(id){ document.getElementById(id).classList.add('done'); }
+const delay = ms => new Promise(r=>setTimeout(r,ms));
+
+// ─── GALLERY ───
+function renderGallery() {
+  const list = document.getElementById('galleryList');
+  updateBadge();
+  if (!scans.length) {
+    list.innerHTML = `<div class="empty-gallery"><span class="icon">📦</span><p>No hay paquetes escaneados aún.</p></div>`;
+    return;
+  }
+  document.getElementById('countChip').textContent = `${scans.length} registros`;
+  list.innerHTML = scans.map(s => {
+    const fc = fechaClass(s.fecha_promesa);
+    const cc = s.confianza>=70?'#34d399':s.confianza>=40?'#fbbf24':'#f87171';
+    const syncClass = s.synced ? '' : 'pending';
+    const syncTxt   = s.synced ? '● En Sheets' : '● Pendiente de sync';
+    return `<div class="pkg-card" onclick="openModal(${s.id})">
+      <div class="pkg-card-header">
+        <img class="pkg-thumb" src="${s.image}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="">
+        <div class="pkg-thumb-ph" style="display:none">📦</div>
+        <div class="pkg-card-title">
+          <div class="pkg-id">${s.id_paquete||'ID no detectado'}</div>
+          <div class="pkg-date-scan">${s.date} · <span style="color:${cc};font-family:var(--mono);font-size:10px">${s.confianza}%</span></div>
+          <div class="pkg-synced ${syncClass}">${syncTxt}</div>
+        </div>
+      </div>
+      <div class="pkg-card-fields">
+        <div class="pf">
+          <div class="pf-label">⬛ Origen</div>
+          <div class="pf-value ${s.origen?'ok':'nd'}">${s.origen||'N/D'}</div>
+        </div>
+        <div class="pf">
+          <div class="pf-label">📅 Fecha Promesa</div>
+          <div class="pf-value"><span class="fecha-badge ${fc}">${s.fecha_promesa||'N/D'}</span></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fechaClass(f) {
+  if (!f) return 'fb-nd';
+  const p = f.split('/');
+  if (p.length<3) return 'fb-nd';
+  const d   = new Date(`${p[2]}-${p[1]}-${p[0]}`);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const diff = Math.ceil((d-now)/86400000);
+  return diff<0?'fb-late':diff<=2?'fb-urgent':'fb-ok';
+}
+
+function updateBadge() {
+  document.getElementById('countBadge').textContent = scans.length;
+  const synced  = scans.filter(s=>s.synced).length;
+  document.getElementById('bannerSub').textContent =
+    scans.length ? `${synced} de ${scans.length} registros en Sheets` : 'Configura el webhook para sincronizar';
+}
+
+// ─── MODAL ───
+function openModal(id) {
+  const s = scans.find(x=>x.id===id); if (!s) return;
+  const fc = fechaClass(s.fecha_promesa);
+  document.getElementById('modalContent').innerHTML = `
+    <img class="modal-img" src="${s.image}" onerror="this.style.display='none'" alt="">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">ESCANEO: ${s.date}</div>
+      <div style="font-size:10px;${s.synced?'color:#34d399':'color:#fbbf24'}">${s.synced?'● En Sheets':'● Pendiente'}</div>
+    </div>
+    <div class="modal-fields">
+      <div class="mf">
+        <div class="mf-icon">⬛</div>
+        <div class="mf-info">
+          <div class="mf-label">Origen — cuadro negro ↖</div>
+          <div class="mf-value ${s.origen?'found':'missing'}">${s.origen||'No detectado'}</div>
+        </div>
+      </div>
+      <div class="mf">
+        <div class="mf-icon">📦</div>
+        <div class="mf-info">
+          <div class="mf-label">ID / Guía del Paquete</div>
+          <div class="mf-value ${s.id_paquete?'found':'missing'}">${s.id_paquete||'No detectado'}</div>
+        </div>
+      </div>
+      <div class="mf">
+        <div class="mf-icon">📅</div>
+        <div class="mf-info">
+          <div class="mf-label">Fecha Promesa de Entrega</div>
+          <div class="mf-value ${s.fecha_promesa?'found':'missing'}">
+            ${s.fecha_promesa?`<span class="fecha-badge ${fc}">${s.fecha_promesa}</span>`:'No detectada'}
+          </div>
+        </div>
+      </div>
+      ${s.notas?`<div class="mf"><div class="mf-icon">💡</div><div class="mf-info"><div class="mf-label">Notas IA</div><div class="mf-value found" style="font-size:13px">${s.notas}</div></div></div>`:''}
+      <div style="padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">CONFIANZA IA</div>
+        <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${s.confianza}%;background:${s.confianza>=70?'var(--accent3)':s.confianza>=40?'var(--warn)':'var(--danger)'};border-radius:2px"></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent)">${s.confianza}%</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="action-btn btn-primary"   onclick="copyAll(${id})">📋 Copiar</button>
+      <button class="action-btn btn-sheets"    onclick="openSheet()">📊 Sheet</button>
+      <button class="action-btn btn-secondary" onclick="retryOne(${id})">🔄 Sync</button>
+      <button class="action-btn btn-danger"    onclick="deleteScan(${id})">🗑️</button>
+    </div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+document.getElementById('modal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+
+async function retryOne(id) {
+  const s = scans.find(x=>x.id===id); if(!s) return;
+  closeModal();
+  const ok = await pushToSheets(s);
+  s.synced = ok;
+  localStorage.setItem('pkgscan_v4', JSON.stringify(scans));
+  renderGallery();
+  showToast(ok?'✅ Sincronizado en Sheets':'❌ No se pudo enviar — revisa la URL', ok?'ok':'err');
+}
+
+function copyAll(id) {
+  const s = scans.find(x=>x.id===id); if(!s) return;
+  navigator.clipboard.writeText(
+    `ORIGEN: ${s.origen||'N/D'}\nID PAQUETE: ${s.id_paquete||'N/D'}\nFECHA PROMESA: ${s.fecha_promesa||'N/D'}`
+  ).then(()=>showToast('📋 Datos copiados'));
+}
+
+function deleteScan(id) {
+  scans = scans.filter(s=>s.id!==id);
+  localStorage.setItem('pkgscan_v4', JSON.stringify(scans));
+  renderGallery(); updateBadge(); closeModal();
+  showToast('🗑️ Eliminado');
+}
+
+// ─── TABS ───
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('cameraSection').classList.toggle('active', tab==='camera');
+  document.getElementById('gallerySection').classList.toggle('active', tab==='gallery');
+  if (tab==='gallery') renderGallery();
+}
+
+// ─── SETUP GUIDE ───
+function showSetupGuide() { document.getElementById('guideModal').classList.add('open'); }
+function closeGuide()     { document.getElementById('guideModal').classList.remove('open'); }
+document.getElementById('guideModal').addEventListener('click', function(e){ if(e.target===this) closeGuide(); });
+function copyScript() {
+  const code = document.getElementById('scriptCode').textContent;
+  navigator.clipboard.writeText(code).then(()=>showToast('📋 Código copiado'));
+}
+
+// ─── TOAST ───
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(()=>t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
